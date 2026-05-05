@@ -402,6 +402,7 @@
         const authToken = urlParams.get("m4g_token") || urlParams.get("access_token") || "";
         let currentUser = null;
         let currentUserId = isPlayerUuid ? playerId : "";
+        let activeMatchId = urlParams.get("matchId") || urlParams.get("match_id") || "";
 
         if (authToken) {
           urlParams.delete("m4g_token");
@@ -459,6 +460,19 @@
           saveStatusEl.className = `save-status ${state}`.trim();
         }
 
+        function createId() {
+          if (window.crypto?.randomUUID) {
+            return window.crypto.randomUUID();
+          }
+
+          return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (char) =>
+            (
+              Number(char) ^
+              (window.crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(char) / 4)))
+            ).toString(16),
+          );
+        }
+
         async function supabaseRequest(path, options = {}) {
           const authenticated = Boolean(options.authenticated && authToken);
           const headers = {
@@ -496,6 +510,34 @@
 
           const text = await response.text();
           return text ? JSON.parse(text) : null;
+        }
+
+        async function ensureMatch(playerIdValue) {
+          if (activeMatchId) {
+            return activeMatchId;
+          }
+
+          const nextMatchId = createId();
+          await supabaseRequest("matches", {
+            method: "POST",
+            authenticated: Boolean(currentUser && authToken),
+            headers: {
+              Prefer: "return=minimal",
+            },
+            body: [
+              {
+                id: nextMatchId,
+                game_id: gameId,
+                player_1: playerIdValue,
+                player_2: null,
+                status: "pending",
+                created_at: new Date().toISOString(),
+              },
+            ],
+          });
+
+          activeMatchId = nextMatchId;
+          return activeMatchId;
         }
 
         async function hydrateAccount() {
@@ -562,7 +604,9 @@
           setSaveStatus("Guardando puntuacion en M4G...");
 
           try {
-            await supabaseRequest("scores", {
+            const matchId = await ensureMatch(targetUserId);
+
+            await supabaseRequest("match_results", {
               method: "POST",
               authenticated: Boolean(currentUser && authToken),
               headers: {
@@ -570,9 +614,13 @@
               },
               body: [
                 {
-                  user_id: targetUserId,
-                  game_id: gameId,
-                  score: normalizedScore,
+                  match_id: matchId,
+                  winner_id: targetUserId,
+                  loser_id: null,
+                  final_score_player_1: normalizedScore,
+                  final_score_player_2: 0,
+                  points_awarded: 0,
+                  created_at: new Date().toISOString(),
                 },
               ],
             });
@@ -850,6 +898,7 @@
 
         function reset(startRunning = false) {
           game = initialState(startRunning ? "running" : "ready");
+          activeMatchId = "";
           scoreEl.textContent = "0";
           flapButton.textContent = startRunning ? "Saltar" : "Saltar";
           setSaveStatus(
