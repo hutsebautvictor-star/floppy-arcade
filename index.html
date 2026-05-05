@@ -245,6 +245,98 @@
         text-align: center;
       }
 
+      .account-card,
+      .ranking-card {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 14px;
+        background: var(--panel);
+        backdrop-filter: blur(14px);
+      }
+
+      .account-title,
+      .ranking-title {
+        margin: 0;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 950;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .account-status,
+      .ranking-note,
+      .save-status {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .account-status.connected,
+      .save-status.saved {
+        color: var(--lime);
+      }
+
+      .save-status.error {
+        color: #fb7185;
+      }
+
+      .ranking-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .ranking-sync {
+        color: var(--violet-soft);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .ranking-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .ranking-row {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 38px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 8px 10px;
+        background: rgba(2, 6, 23, 0.42);
+      }
+
+      .ranking-rank {
+        color: var(--lime);
+        font-size: 12px;
+        font-weight: 950;
+      }
+
+      .ranking-player {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ranking-score {
+        color: var(--violet-soft);
+        font-size: 12px;
+        font-weight: 950;
+      }
+
       @media (min-width: 820px) {
         .shell {
           gap: 18px;
@@ -315,6 +407,24 @@
             <button class="button button-secondary" id="reset" type="button">Reset</button>
           </div>
 
+          <div class="account-card">
+            <p class="account-title">Cuenta M4G</p>
+            <p class="account-status" id="account-status">
+              Abre el juego desde M4G para guardar tu puntuacion.
+            </p>
+            <p class="save-status" id="save-status">Cada portal cuenta 1 punto de ranking.</p>
+          </div>
+
+          <div class="ranking-card">
+            <div class="ranking-head">
+              <p class="ranking-title">Ranking</p>
+              <span class="ranking-sync" id="ranking-sync">online</span>
+            </div>
+            <div class="ranking-list" id="ranking-list">
+              <p class="ranking-note">Cargando puntuaciones...</p>
+            </div>
+          </div>
+
           <p class="help">
             En movil, toca el juego o pulsa Saltar. En escritorio tambien puedes usar espacio,
             flecha arriba o W.
@@ -333,6 +443,10 @@
         const bestEl = document.getElementById("best");
         const flapButton = document.getElementById("flap");
         const resetButton = document.getElementById("reset");
+        const accountStatusEl = document.getElementById("account-status");
+        const saveStatusEl = document.getElementById("save-status");
+        const rankingListEl = document.getElementById("ranking-list");
+        const rankingSyncEl = document.getElementById("ranking-sync");
 
         const W = 390;
         const H = 640;
@@ -343,6 +457,25 @@
         const FLAP = -390;
         const PIPE_W = 62;
         const BEST_KEY = "m4g-floppy-arcade-best";
+        const SUPABASE_URL = "https://gfuldfbbwdjfetjfvkti.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_y4DPP3pXrRjOiZUNVjAZcg_1ap9jRk2";
+        const DEFAULT_GAME_ID = "2f7a6d5c-56b6-4e26-bb0b-4bc09139a1af";
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameId =
+          urlParams.get("m4g_game_id") || urlParams.get("gameId") || DEFAULT_GAME_ID;
+        const authToken = urlParams.get("m4g_token") || urlParams.get("access_token") || "";
+        let currentUser = null;
+
+        if (authToken) {
+          urlParams.delete("m4g_token");
+          urlParams.delete("access_token");
+          urlParams.delete("refresh_token");
+          urlParams.delete("m4g_game_id");
+          const nextSearch = urlParams.toString();
+          const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
+          window.history.replaceState(null, "", nextUrl);
+        }
 
         const stars = Array.from({ length: 42 }, (_, index) => ({
           x: (index * 73) % W,
@@ -370,6 +503,186 @@
         }
 
         let game = initialState();
+
+        function formatNumber(value) {
+          return Math.floor(value).toLocaleString("es-ES");
+        }
+
+        function getDisplayName(user) {
+          const metadata = user?.user_metadata || {};
+          return (
+            metadata.username ||
+            metadata.full_name ||
+            user?.email?.split("@")[0] ||
+            "Jugador"
+          );
+        }
+
+        function escapeHtml(value) {
+          return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        }
+
+        function setSaveStatus(message, state = "") {
+          saveStatusEl.textContent = message;
+          saveStatusEl.className = `save-status ${state}`.trim();
+        }
+
+        async function supabaseRequest(path, options = {}) {
+          const authenticated = Boolean(options.authenticated && authToken);
+          const headers = {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${authenticated ? authToken : SUPABASE_KEY}`,
+            ...(options.headers || {}),
+          };
+
+          const request = {
+            method: options.method || "GET",
+            headers,
+          };
+
+          if (options.body !== undefined) {
+            headers["Content-Type"] = "application/json";
+            request.body = JSON.stringify(options.body);
+          }
+
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, request);
+
+          if (!response.ok) {
+            let message = "No se pudo conectar con Supabase.";
+            try {
+              const errorPayload = await response.json();
+              message = errorPayload.message || errorPayload.details || message;
+            } catch {
+              message = response.statusText || message;
+            }
+            throw new Error(message);
+          }
+
+          if (response.status === 204) {
+            return null;
+          }
+
+          const text = await response.text();
+          return text ? JSON.parse(text) : null;
+        }
+
+        async function hydrateAccount() {
+          if (!authToken) {
+            accountStatusEl.textContent = "Modo invitado. Abre desde M4G para guardar puntos.";
+            setSaveStatus("Cada portal cuenta 1 punto de ranking.");
+            return;
+          }
+
+          try {
+            const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: `Bearer ${authToken}`,
+              },
+            });
+
+            if (!response.ok) {
+              throw new Error("La sesion de M4G no es valida o ha caducado.");
+            }
+
+            currentUser = await response.json();
+            accountStatusEl.textContent = `Conectado como ${getDisplayName(currentUser)}.`;
+            accountStatusEl.classList.add("connected");
+            setSaveStatus("Tu proxima run se guardara en el ranking.", "saved");
+          } catch (error) {
+            currentUser = null;
+            accountStatusEl.textContent =
+              error instanceof Error ? error.message : "No se pudo cargar tu cuenta M4G.";
+            setSaveStatus("Abre el juego otra vez desde M4G para guardar puntos.", "error");
+          }
+        }
+
+        function renderRanking(entries) {
+          if (!entries.length) {
+            rankingListEl.innerHTML = '<p class="ranking-note">Sin puntuaciones todavia.</p>';
+            return;
+          }
+
+          rankingListEl.innerHTML = entries
+            .map((entry, index) => {
+              const safeName = escapeHtml(entry.username || "Jugador");
+              const safeScore = formatNumber(Number(entry.best_score || 0));
+              return `
+                <div class="ranking-row">
+                  <span class="ranking-rank">#${index + 1}</span>
+                  <span class="ranking-player" title="${safeName}">${safeName}</span>
+                  <span class="ranking-score">${safeScore}</span>
+                </div>
+              `;
+            })
+            .join("");
+        }
+
+        async function loadRanking() {
+          rankingSyncEl.textContent = "online";
+
+          try {
+            const query = [
+              "select=game_id,user_id,username,avatar_url,best_score",
+              `game_id=eq.${encodeURIComponent(gameId)}`,
+              "order=best_score.desc",
+              "limit=5",
+            ].join("&");
+            const entries = await supabaseRequest(`game_ranking?${query}`);
+            renderRanking(entries || []);
+          } catch {
+            rankingSyncEl.textContent = "offline";
+            rankingListEl.innerHTML =
+              '<p class="ranking-note">No se pudo cargar el ranking.</p>';
+          }
+        }
+
+        async function submitScore(rawScore) {
+          const normalizedScore = Math.max(0, Math.floor(rawScore));
+
+          if (!normalizedScore) {
+            return;
+          }
+
+          if (!currentUser || !authToken) {
+            setSaveStatus("Run terminada. Abre desde M4G para guardarla en tu cuenta.");
+            return;
+          }
+
+          setSaveStatus("Guardando puntuacion en M4G...");
+
+          try {
+            await supabaseRequest("scores", {
+              method: "POST",
+              authenticated: true,
+              headers: {
+                Prefer: "return=minimal",
+              },
+              body: [
+                {
+                  user_id: currentUser.id,
+                  game_id: gameId,
+                  score: normalizedScore,
+                },
+              ],
+            });
+
+            setSaveStatus(`Guardado: ${formatNumber(normalizedScore)} puntos.`, "saved");
+            await loadRanking();
+          } catch (error) {
+            setSaveStatus(
+              error instanceof Error
+                ? `No se pudo guardar: ${error.message}`
+                : "No se pudo guardar la puntuacion.",
+              "error",
+            );
+          }
+        }
 
         function clamp(value, min, max) {
           return Math.min(Math.max(value, min), max);
@@ -628,12 +941,19 @@
           localStorage.setItem(BEST_KEY, String(best));
           bestEl.textContent = String(best);
           flapButton.textContent = "Reintentar";
+          void submitScore(game.score);
         }
 
         function reset(startRunning = false) {
           game = initialState(startRunning ? "running" : "ready");
           scoreEl.textContent = "0";
           flapButton.textContent = startRunning ? "Saltar" : "Saltar";
+          setSaveStatus(
+            currentUser
+              ? "Tu proxima run se guardara en el ranking."
+              : "Cada portal cuenta 1 punto de ranking.",
+            currentUser ? "saved" : "",
+          );
         }
 
         function flap() {
@@ -681,6 +1001,8 @@
         });
         window.addEventListener("resize", resize);
 
+        void hydrateAccount();
+        void loadRanking();
         resize();
         requestAnimationFrame(tick);
       })();
