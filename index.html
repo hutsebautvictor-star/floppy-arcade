@@ -245,8 +245,7 @@
         text-align: center;
       }
 
-      .account-card,
-      .ranking-card {
+      .account-card {
         border: 1px solid var(--line);
         border-radius: 20px;
         padding: 14px;
@@ -254,8 +253,7 @@
         backdrop-filter: blur(14px);
       }
 
-      .account-title,
-      .ranking-title {
+      .account-title {
         margin: 0;
         color: var(--text);
         font-size: 13px;
@@ -265,7 +263,6 @@
       }
 
       .account-status,
-      .ranking-note,
       .save-status {
         margin: 7px 0 0;
         color: var(--muted);
@@ -280,61 +277,6 @@
 
       .save-status.error {
         color: #fb7185;
-      }
-
-      .ranking-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      .ranking-sync {
-        color: var(--violet-soft);
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-
-      .ranking-list {
-        display: grid;
-        gap: 8px;
-        margin-top: 12px;
-      }
-
-      .ranking-row {
-        display: grid;
-        grid-template-columns: 34px minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 10px;
-        min-height: 38px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        padding: 8px 10px;
-        background: rgba(2, 6, 23, 0.42);
-      }
-
-      .ranking-rank {
-        color: var(--lime);
-        font-size: 12px;
-        font-weight: 950;
-      }
-
-      .ranking-player {
-        min-width: 0;
-        overflow: hidden;
-        color: var(--text);
-        font-size: 12px;
-        font-weight: 800;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .ranking-score {
-        color: var(--violet-soft);
-        font-size: 12px;
-        font-weight: 950;
       }
 
       @media (min-width: 820px) {
@@ -412,17 +354,7 @@
             <p class="account-status" id="account-status">
               Abre el juego desde M4G para guardar tu puntuacion.
             </p>
-            <p class="save-status" id="save-status">Cada portal cuenta 1 punto de ranking.</p>
-          </div>
-
-          <div class="ranking-card">
-            <div class="ranking-head">
-              <p class="ranking-title">Ranking</p>
-              <span class="ranking-sync" id="ranking-sync">online</span>
-            </div>
-            <div class="ranking-list" id="ranking-list">
-              <p class="ranking-note">Cargando puntuaciones...</p>
-            </div>
+            <p class="save-status" id="save-status">Cada portal cuenta 1 punto.</p>
           </div>
 
           <p class="help">
@@ -445,8 +377,6 @@
         const resetButton = document.getElementById("reset");
         const accountStatusEl = document.getElementById("account-status");
         const saveStatusEl = document.getElementById("save-status");
-        const rankingListEl = document.getElementById("ranking-list");
-        const rankingSyncEl = document.getElementById("ranking-sync");
 
         const W = 390;
         const H = 640;
@@ -464,8 +394,14 @@
         const urlParams = new URLSearchParams(window.location.search);
         const gameId =
           urlParams.get("m4g_game_id") || urlParams.get("gameId") || DEFAULT_GAME_ID;
+        const playerId = urlParams.get("player") || "";
+        const isPlayerUuid =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            playerId,
+          );
         const authToken = urlParams.get("m4g_token") || urlParams.get("access_token") || "";
         let currentUser = null;
+        let currentUserId = isPlayerUuid ? playerId : "";
 
         if (authToken) {
           urlParams.delete("m4g_token");
@@ -518,15 +454,6 @@
           );
         }
 
-        function escapeHtml(value) {
-          return String(value)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-        }
-
         function setSaveStatus(message, state = "") {
           saveStatusEl.textContent = message;
           saveStatusEl.className = `save-status ${state}`.trim();
@@ -573,8 +500,15 @@
 
         async function hydrateAccount() {
           if (!authToken) {
+            if (currentUserId) {
+              accountStatusEl.textContent = "Conectado desde M4G.";
+              accountStatusEl.classList.add("connected");
+              setSaveStatus("Tu proxima run se guardara en tu cuenta.", "saved");
+              return;
+            }
+
             accountStatusEl.textContent = "Modo invitado. Abre desde M4G para guardar puntos.";
-            setSaveStatus("Cada portal cuenta 1 punto de ranking.");
+            setSaveStatus("Cada portal cuenta 1 punto.");
             return;
           }
 
@@ -591,54 +525,23 @@
             }
 
             currentUser = await response.json();
+            currentUserId = currentUser.id;
             accountStatusEl.textContent = `Conectado como ${getDisplayName(currentUser)}.`;
             accountStatusEl.classList.add("connected");
-            setSaveStatus("Tu proxima run se guardara en el ranking.", "saved");
+            setSaveStatus("Tu proxima run se guardara en tu cuenta.", "saved");
           } catch (error) {
             currentUser = null;
+
+            if (currentUserId) {
+              accountStatusEl.textContent = "Conectado desde M4G.";
+              accountStatusEl.classList.add("connected");
+              setSaveStatus("Tu proxima run se guardara en tu cuenta.", "saved");
+              return;
+            }
+
             accountStatusEl.textContent =
               error instanceof Error ? error.message : "No se pudo cargar tu cuenta M4G.";
             setSaveStatus("Abre el juego otra vez desde M4G para guardar puntos.", "error");
-          }
-        }
-
-        function renderRanking(entries) {
-          if (!entries.length) {
-            rankingListEl.innerHTML = '<p class="ranking-note">Sin puntuaciones todavia.</p>';
-            return;
-          }
-
-          rankingListEl.innerHTML = entries
-            .map((entry, index) => {
-              const safeName = escapeHtml(entry.username || "Jugador");
-              const safeScore = formatNumber(Number(entry.best_score || 0));
-              return `
-                <div class="ranking-row">
-                  <span class="ranking-rank">#${index + 1}</span>
-                  <span class="ranking-player" title="${safeName}">${safeName}</span>
-                  <span class="ranking-score">${safeScore}</span>
-                </div>
-              `;
-            })
-            .join("");
-        }
-
-        async function loadRanking() {
-          rankingSyncEl.textContent = "online";
-
-          try {
-            const query = [
-              "select=game_id,user_id,username,avatar_url,best_score",
-              `game_id=eq.${encodeURIComponent(gameId)}`,
-              "order=best_score.desc",
-              "limit=5",
-            ].join("&");
-            const entries = await supabaseRequest(`game_ranking?${query}`);
-            renderRanking(entries || []);
-          } catch {
-            rankingSyncEl.textContent = "offline";
-            rankingListEl.innerHTML =
-              '<p class="ranking-note">No se pudo cargar el ranking.</p>';
           }
         }
 
@@ -649,7 +552,9 @@
             return;
           }
 
-          if (!currentUser || !authToken) {
+          const targetUserId = currentUser?.id || currentUserId;
+
+          if (!targetUserId) {
             setSaveStatus("Run terminada. Abre desde M4G para guardarla en tu cuenta.");
             return;
           }
@@ -659,13 +564,13 @@
           try {
             await supabaseRequest("scores", {
               method: "POST",
-              authenticated: true,
+              authenticated: Boolean(currentUser && authToken),
               headers: {
                 Prefer: "return=minimal",
               },
               body: [
                 {
-                  user_id: currentUser.id,
+                  user_id: targetUserId,
                   game_id: gameId,
                   score: normalizedScore,
                 },
@@ -673,7 +578,6 @@
             });
 
             setSaveStatus(`Guardado: ${formatNumber(normalizedScore)} puntos.`, "saved");
-            await loadRanking();
           } catch (error) {
             setSaveStatus(
               error instanceof Error
@@ -949,10 +853,10 @@
           scoreEl.textContent = "0";
           flapButton.textContent = startRunning ? "Saltar" : "Saltar";
           setSaveStatus(
-            currentUser
-              ? "Tu proxima run se guardara en el ranking."
-              : "Cada portal cuenta 1 punto de ranking.",
-            currentUser ? "saved" : "",
+            currentUser || currentUserId
+              ? "Tu proxima run se guardara en tu cuenta."
+              : "Cada portal cuenta 1 punto.",
+            currentUser || currentUserId ? "saved" : "",
           );
         }
 
@@ -1002,7 +906,6 @@
         window.addEventListener("resize", resize);
 
         void hydrateAccount();
-        void loadRanking();
         resize();
         requestAnimationFrame(tick);
       })();
