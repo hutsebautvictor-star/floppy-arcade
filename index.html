@@ -1,12 +1,17 @@
-```html
 <!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#020617" />
+    <meta
+      name="description"
+      content="Floppy Arcade, minijuego arcade responsive de Make4Gamers."
+    />
+    <meta property="og:title" content="Floppy Arcade" />
+    <meta property="og:description" content="Toca para volar y esquiva portales neon." />
+    <meta property="og:image" content="./thumbnail.png" />
     <title>Floppy Arcade</title>
-
     <style>
       :root {
         color-scheme: dark;
@@ -14,31 +19,33 @@
         --panel: rgba(15, 23, 42, 0.76);
         --line: rgba(255, 255, 255, 0.12);
         --text: #f8fafc;
+        --muted: #94a3b8;
         --violet: #7c3aed;
+        --violet-soft: #a78bfa;
         --lime: #bef264;
+        --orange: #f97316;
       }
 
       * {
         box-sizing: border-box;
-        margin: 0;
-        padding: 0;
       }
 
       html,
       body {
         width: 100%;
-        height: 100%;
-        overflow: hidden;
+        min-height: 100%;
+        margin: 0;
+        overflow-x: hidden;
         background: var(--bg);
+        color: var(--text);
         font-family:
           Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
         touch-action: manipulation;
       }
 
       body {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        min-height: 100svh;
       }
 
       button {
@@ -46,29 +53,110 @@
       }
 
       .shell {
-        width: 100%;
+        position: relative;
+        min-height: 100svh;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 12px;
+        padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+          max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+        isolation: isolate;
+      }
+
+      .shell::before,
+      .shell::after {
+        content: "";
+        position: fixed;
+        inset: auto;
+        z-index: -1;
+        width: 320px;
+        height: 320px;
+        border-radius: 999px;
+        filter: blur(34px);
+        opacity: 0.34;
+      }
+
+      .shell::before {
+        top: -100px;
+        left: -80px;
+        background: var(--violet);
+      }
+
+      .shell::after {
+        right: -120px;
+        bottom: -120px;
+        background: var(--lime);
+        opacity: 0.16;
+      }
+
+      .topbar {
         display: flex;
-        justify-content: center;
         align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: min(100%, 1040px);
+        margin: 0 auto;
+      }
+
+      .brand {
+        display: grid;
+        gap: 2px;
+      }
+
+      .eyebrow {
+        color: var(--lime);
+        font-size: 10px;
+        font-weight: 950;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+      }
+
+      .brand-title {
+        color: var(--text);
+        font-size: clamp(18px, 6vw, 34px);
+        font-weight: 950;
+        line-height: 0.95;
+        text-transform: uppercase;
+      }
+
+      .brand-title span {
+        color: var(--violet-soft);
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 9px 12px;
+        background: rgba(15, 23, 42, 0.74);
+        color: #e2e8f0;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        white-space: nowrap;
       }
 
       .stage {
-        width: 100%;
-        display: flex;
-        justify-content: center;
+        width: min(100%, 1040px);
+        min-height: 0;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
         align-items: center;
+        gap: 12px;
       }
 
       .game-wrap {
         position: relative;
-        width: min(100vw, 360px);
-        aspect-ratio: 9 / 16;
-        height: min(72vh, 640px);
+        width: min(100%, 440px);
+        aspect-ratio: 390 / 640;
+        max-height: min(76svh, 720px);
+        margin: 0 auto;
         overflow: hidden;
-        border-radius: 18px;
-        border: 1px solid rgba(167, 139, 250, 0.2);
+        border: 1px solid rgba(167, 139, 250, 0.26);
+        border-radius: clamp(22px, 6vw, 34px);
         background: #020617;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+        box-shadow: 0 26px 80px rgba(0, 0, 0, 0.5), 0 0 44px rgba(124, 58, 237, 0.18);
       }
 
       canvas {
@@ -77,81 +165,203 @@
         height: 100%;
         touch-action: none;
         user-select: none;
+        -webkit-user-select: none;
       }
 
-      .side {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        z-index: 20;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 8px;
+      .hud {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
       }
 
       .score-card {
-        padding: 6px 12px;
-        border-radius: 12px;
-        background: rgba(15, 23, 42, 0.72);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(10px);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 13px;
+        background: var(--panel);
+        backdrop-filter: blur(14px);
+      }
+
+      .score-label {
+        margin: 0 0 4px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
       }
 
       .score-value {
-        color: white;
-        font-size: 18px;
-        font-weight: 900;
+        margin: 0;
+        color: var(--text);
+        font-size: 34px;
+        font-weight: 950;
+        line-height: 1;
+      }
+
+      .score-card:last-child .score-value {
+        color: var(--lime);
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
       }
 
       .button {
+        min-height: 52px;
         border: 0;
-        border-radius: 10px;
-        padding: 10px 14px;
+        border-radius: 18px;
+        padding: 0 18px;
         cursor: pointer;
         color: white;
-        font-size: 11px;
-        font-weight: 900;
-        letter-spacing: 0.08em;
+        font-size: 13px;
+        font-weight: 950;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
-        background: linear-gradient(135deg, #8b5cf6, #4f46e5);
+        transition: transform 140ms ease, filter 140ms ease;
       }
 
       .button:active {
         transform: scale(0.98);
       }
 
-      @media (max-width: 480px) {
-        .game-wrap {
-          width: 100vw;
-          height: 100vh;
-          border-radius: 0;
-          border: 0;
+      .button-primary {
+        flex: 1;
+        background: linear-gradient(135deg, #8b5cf6, #4f46e5);
+        box-shadow: 0 16px 38px rgba(124, 58, 237, 0.35);
+      }
+
+      .button-secondary {
+        border: 1px solid var(--line);
+        background: rgba(15, 23, 42, 0.76);
+      }
+
+      .help {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+        text-align: center;
+      }
+
+      .account-card {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 14px;
+        background: var(--panel);
+        backdrop-filter: blur(14px);
+      }
+
+      .account-title {
+        margin: 0;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 950;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .account-status,
+      .save-status {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .account-status.connected,
+      .save-status.saved {
+        color: var(--lime);
+      }
+
+      .save-status.error {
+        color: #fb7185;
+      }
+
+      @media (min-width: 820px) {
+        .shell {
+          gap: 18px;
+          padding: 18px 24px;
         }
 
-        .score-value {
-          font-size: 16px;
+        .stage {
+          grid-template-columns: minmax(0, 0.9fr) minmax(280px, 0.46fr);
+          gap: 28px;
+        }
+
+        .side {
+          display: grid;
+          gap: 14px;
+        }
+
+        .help {
+          text-align: left;
+        }
+      }
+
+      @media (max-width: 819px) {
+        .side {
+          display: grid;
+          gap: 10px;
+        }
+
+        .game-wrap {
+          width: min(100%, 390px);
+          max-height: 64svh;
+        }
+
+        .pill {
+          display: none;
         }
       }
     </style>
   </head>
-
   <body>
     <main class="shell">
+      <header class="topbar">
+        <div class="brand" aria-label="Floppy Arcade">
+          <div class="eyebrow">M4G Arcade</div>
+          <div class="brand-title">Floppy <span>Arcade</span></div>
+        </div>
+        <div class="pill">Toca para volar</div>
+      </header>
+
       <section class="stage">
         <div class="game-wrap">
-          <canvas id="game"></canvas>
+          <canvas id="game" aria-label="Floppy Arcade"></canvas>
+        </div>
 
-          <aside class="side">
+        <aside class="side">
+          <div class="hud">
             <div class="score-card">
+              <p class="score-label">Puntos</p>
               <p class="score-value" id="score">0</p>
             </div>
+            <div class="score-card">
+              <p class="score-label">Record</p>
+              <p class="score-value" id="best">0</p>
+            </div>
+          </div>
 
-            <button class="button" id="retry" type="button" style="display: none">
-              Reintentar
-            </button>
-          </aside>
-        </div>
+          <div class="controls">
+            <button class="button button-primary" id="flap" type="button">Saltar</button>
+            <button class="button button-secondary" id="reset" type="button">Reset</button>
+          </div>
+
+          <div class="account-card">
+            <p class="account-title">Cuenta M4G</p>
+            <p class="account-status" id="account-status">
+              Abre el juego desde M4G para guardar tu puntuacion.
+            </p>
+            <p class="save-status" id="save-status">Cada portal cuenta 1 punto.</p>
+          </div>
+
+          <p class="help">
+            En movil, toca el juego o pulsa Saltar. En escritorio tambien puedes usar espacio,
+            flecha arriba o W.
+          </p>
+        </aside>
       </section>
     </main>
 
@@ -161,9 +371,12 @@
 
         const canvas = document.getElementById("game");
         const ctx = canvas.getContext("2d", { alpha: false });
-
         const scoreEl = document.getElementById("score");
-        const retryButton = document.getElementById("retry");
+        const bestEl = document.getElementById("best");
+        const flapButton = document.getElementById("flap");
+        const resetButton = document.getElementById("reset");
+        const accountStatusEl = document.getElementById("account-status");
+        const saveStatusEl = document.getElementById("save-status");
 
         const W = 390;
         const H = 640;
@@ -173,6 +386,32 @@
         const GRAVITY = 1180;
         const FLAP = -390;
         const PIPE_W = 62;
+        const BEST_KEY = "m4g-floppy-arcade-best";
+        const SUPABASE_URL = "https://gfuldfbbwdjfetjfvkti.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_y4DPP3pXrRjOiZUNVjAZcg_1ap9jRk2";
+        const DEFAULT_GAME_ID = "2f7a6d5c-56b6-4e26-bb0b-4bc09139a1af";
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameId =
+          urlParams.get("m4g_game_id") || urlParams.get("gameId") || DEFAULT_GAME_ID;
+        const playerId = urlParams.get("player") || "";
+        const isPlayerUuid =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            playerId,
+          );
+        const authToken = urlParams.get("m4g_token") || urlParams.get("access_token") || "";
+        let currentUser = null;
+        let currentUserId = isPlayerUuid ? playerId : "";
+
+        if (authToken) {
+          urlParams.delete("m4g_token");
+          urlParams.delete("access_token");
+          urlParams.delete("refresh_token");
+          urlParams.delete("m4g_game_id");
+          const nextSearch = urlParams.toString();
+          const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
+          window.history.replaceState(null, "", nextUrl);
+        }
 
         const stars = Array.from({ length: 42 }, (_, index) => ({
           x: (index * 73) % W,
@@ -181,6 +420,10 @@
           speed: 14 + (index % 5) * 8,
           color: index % 4 === 0 ? "#bef264" : index % 3 === 0 ? "#c084fc" : "#93c5fd",
         }));
+
+        let best = Number(localStorage.getItem(BEST_KEY) || 0);
+        if (!Number.isFinite(best)) best = 0;
+        bestEl.textContent = String(best);
 
         function initialState(mode = "ready") {
           return {
@@ -197,6 +440,221 @@
 
         let game = initialState();
 
+        function formatNumber(value) {
+          return Math.floor(value).toLocaleString("es-ES");
+        }
+
+        function getDisplayName(user) {
+          const metadata = user?.user_metadata || {};
+          return (
+            metadata.username ||
+            metadata.full_name ||
+            user?.email?.split("@")[0] ||
+            "Jugador"
+          );
+        }
+
+        function setSaveStatus(message, state = "") {
+          saveStatusEl.textContent = message;
+          saveStatusEl.className = `save-status ${state}`.trim();
+        }
+
+        async function supabaseRequest(path, options = {}) {
+          const authenticated = Boolean(options.authenticated && authToken);
+          const headers = {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${authenticated ? authToken : SUPABASE_KEY}`,
+            ...(options.headers || {}),
+          };
+
+          const request = {
+            method: options.method || "GET",
+            headers,
+          };
+
+          if (options.body !== undefined) {
+            headers["Content-Type"] = "application/json";
+            request.body = JSON.stringify(options.body);
+          }
+
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, request);
+
+          if (!response.ok) {
+            let message = "No se pudo conectar con Supabase.";
+            try {
+              const errorPayload = await response.json();
+              message = errorPayload.message || errorPayload.details || message;
+            } catch {
+              message = response.statusText || message;
+            }
+            throw new Error(message);
+          }
+
+          if (response.status === 204) {
+            return null;
+          }
+
+          const text = await response.text();
+          return text ? JSON.parse(text) : null;
+        }
+
+        function getScoreFilter(playerIdValue) {
+          return [
+            `user_id=eq.${encodeURIComponent(playerIdValue)}`,
+            `game_id=eq.${encodeURIComponent(gameId)}`,
+          ].join("&");
+        }
+
+        async function loadSavedScore(playerIdValue) {
+          const query = [
+            "select=score",
+            getScoreFilter(playerIdValue),
+            "limit=1",
+          ].join("&");
+          const rows = await supabaseRequest(`scores?${query}`);
+          const score = Number(rows?.[0]?.score ?? 0);
+          return {
+            exists: Array.isArray(rows) && rows.length > 0,
+            score: Number.isFinite(score) ? score : 0,
+          };
+        }
+
+        function isDuplicateScoreError(error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return /duplicate key value|unique_user_game|23505/i.test(message);
+        }
+
+        async function updateSavedScore(playerIdValue, score) {
+          await supabaseRequest(`scores?${getScoreFilter(playerIdValue)}`, {
+            method: "PATCH",
+            authenticated: Boolean(currentUser && authToken),
+            headers: {
+              Prefer: "return=minimal",
+            },
+            body: {
+              score,
+              updated_at: new Date().toISOString(),
+            },
+          });
+        }
+
+        async function insertSavedScore(playerIdValue, score) {
+          await supabaseRequest("scores", {
+            method: "POST",
+            authenticated: Boolean(currentUser && authToken),
+            headers: {
+              Prefer: "return=minimal",
+            },
+            body: [
+              {
+                user_id: playerIdValue,
+                game_id: gameId,
+                score,
+                updated_at: new Date().toISOString(),
+              },
+            ],
+          });
+        }
+
+        async function hydrateAccount() {
+          if (!authToken) {
+            if (currentUserId) {
+              accountStatusEl.textContent = "Conectado desde M4G.";
+              accountStatusEl.classList.add("connected");
+              setSaveStatus("Tu proxima run se guardara en tu cuenta.", "saved");
+              return;
+            }
+
+            accountStatusEl.textContent = "Modo invitado. Abre desde M4G para guardar puntos.";
+            setSaveStatus("Cada portal cuenta 1 punto.");
+            return;
+          }
+
+          try {
+            const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: `Bearer ${authToken}`,
+              },
+            });
+
+            if (!response.ok) {
+              throw new Error("La sesion de M4G no es valida o ha caducado.");
+            }
+
+            currentUser = await response.json();
+            currentUserId = currentUser.id;
+            accountStatusEl.textContent = `Conectado como ${getDisplayName(currentUser)}.`;
+            accountStatusEl.classList.add("connected");
+            setSaveStatus("Tu proxima run se guardara en tu cuenta.", "saved");
+          } catch (error) {
+            currentUser = null;
+
+            if (currentUserId) {
+              accountStatusEl.textContent = "Conectado desde M4G.";
+              accountStatusEl.classList.add("connected");
+              setSaveStatus("Tu proxima run se guardara en tu cuenta.", "saved");
+              return;
+            }
+
+            accountStatusEl.textContent =
+              error instanceof Error ? error.message : "No se pudo cargar tu cuenta M4G.";
+            setSaveStatus("Abre el juego otra vez desde M4G para guardar puntos.", "error");
+          }
+        }
+
+        async function submitScore(rawScore) {
+          const normalizedScore = Math.max(0, Math.floor(rawScore));
+
+          if (!normalizedScore) {
+            return;
+          }
+
+          const targetUserId = currentUser?.id || currentUserId;
+
+          if (!targetUserId) {
+            setSaveStatus("Run terminada. Abre desde M4G para guardarla en tu cuenta.");
+            return;
+          }
+
+          setSaveStatus("Guardando puntuacion en M4G...");
+
+          try {
+            const previous = await loadSavedScore(targetUserId);
+            const previousScore = previous.score;
+            const savedScore = Math.max(previousScore, normalizedScore);
+
+            if (previous.exists) {
+              if (savedScore > previousScore) {
+                await updateSavedScore(targetUserId, savedScore);
+              }
+            } else {
+              try {
+                await insertSavedScore(targetUserId, savedScore);
+              } catch (insertError) {
+                if (!isDuplicateScoreError(insertError)) {
+                  throw insertError;
+                }
+                await updateSavedScore(targetUserId, savedScore);
+              }
+            }
+
+            setSaveStatus(
+              savedScore > previousScore
+                ? `Nuevo record guardado: ${formatNumber(savedScore)} puntos.`
+                : `Guardado. Tu record sigue en ${formatNumber(savedScore)} puntos.`,
+              "saved",
+            );
+          } catch (error) {
+            setSaveStatus(
+              error instanceof Error
+                ? `No se pudo guardar: ${error.message}`
+                : "No se pudo guardar la puntuacion.",
+              "error",
+            );
+          }
+        }
+
         function clamp(value, min, max) {
           return Math.min(Math.max(value, min), max);
         }
@@ -212,7 +670,6 @@
           const dpr = Math.min(window.devicePixelRatio || 1, 2);
           const nextW = Math.max(1, Math.round(rect.width * dpr));
           const nextH = Math.max(1, Math.round(rect.height * dpr));
-
           if (canvas.width !== nextW || canvas.height !== nextH) {
             canvas.width = nextW;
             canvas.height = nextH;
@@ -221,7 +678,6 @@
 
         function roundedRect(x, y, w, h, r) {
           const radius = Math.min(r, w / 2, h / 2);
-
           ctx.beginPath();
           ctx.moveTo(x + radius, y);
           ctx.lineTo(x + w - radius, y);
@@ -240,7 +696,6 @@
           sky.addColorStop(0, "#11134a");
           sky.addColorStop(0.48, "#25125f");
           sky.addColorStop(1, "#040714");
-
           ctx.fillStyle = sky;
           ctx.fillRect(0, 0, W, H);
 
@@ -250,52 +705,67 @@
             ctx.fillStyle = star.color;
             ctx.fillRect(x, star.y, star.size, star.size);
           }
-
           ctx.globalAlpha = 1;
+
+          ctx.save();
+          ctx.globalAlpha = 0.17;
+          ctx.strokeStyle = "#a78bfa";
+          ctx.lineWidth = 1;
+          for (let x = -W; x < W * 2; x += 32) {
+            const shiftedX = x - ((game.backgroundOffset * 28) % 32);
+            ctx.beginPath();
+            ctx.moveTo(shiftedX, 0);
+            ctx.lineTo(shiftedX + 172, GROUND);
+            ctx.stroke();
+          }
+          for (let y = 80; y < GROUND; y += 40) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(W, y + Math.sin(y * 0.02) * 8);
+            ctx.stroke();
+          }
+          ctx.restore();
         }
 
         function drawGround() {
           const ground = ctx.createLinearGradient(0, GROUND, 0, H);
           ground.addColorStop(0, "#312e81");
           ground.addColorStop(1, "#020617");
-
           ctx.fillStyle = ground;
           ctx.fillRect(0, GROUND, W, H - GROUND);
-
           ctx.fillStyle = "#bef264";
           ctx.fillRect(0, GROUND, W, 4);
+          for (let x = -48; x < W + 48; x += 48) {
+            const shiftedX = x - ((game.backgroundOffset * 128) % 48);
+            ctx.fillStyle = "rgba(255,255,255,0.12)";
+            ctx.fillRect(shiftedX, GROUND + 16, 26, 3);
+          }
         }
 
         function drawObstacle(obstacle) {
           const topH = obstacle.gapY - obstacle.gap / 2;
           const bottomY = obstacle.gapY + obstacle.gap / 2;
           const bottomH = GROUND - bottomY;
-
           const gradient = ctx.createLinearGradient(obstacle.x, 0, obstacle.x + obstacle.width, 0);
           gradient.addColorStop(0, "#4338ca");
           gradient.addColorStop(0.52, "#7c3aed");
           gradient.addColorStop(1, "#111827");
 
           ctx.fillStyle = gradient;
-
           roundedRect(obstacle.x, -10, obstacle.width, topH + 10, 12);
           ctx.fill();
-
           roundedRect(obstacle.x, bottomY, obstacle.width, bottomH + 16, 12);
           ctx.fill();
 
           ctx.fillStyle = "#bef264";
-
           roundedRect(obstacle.x - 7, topH - 20, obstacle.width + 14, 22, 7);
           ctx.fill();
-
           roundedRect(obstacle.x - 7, bottomY, obstacle.width + 14, 22, 7);
           ctx.fill();
         }
 
         function drawPlayer() {
           const angle = clamp(game.velocity / 700, -0.42, 0.5);
-
           ctx.save();
           ctx.translate(PLAYER_X, game.playerY);
           ctx.rotate(angle);
@@ -318,7 +788,6 @@
 
           ctx.fillStyle = "#f8fafc";
           ctx.fillRect(7, -7, 8, 8);
-
           ctx.fillStyle = "#020617";
           ctx.fillRect(11, -4, 4, 4);
 
@@ -326,48 +795,50 @@
           ctx.fillRect(18, -1, 12, 5);
           ctx.fillRect(25, 2, 6, 4);
 
+          ctx.fillStyle = "rgba(255,255,255,0.46)";
+          ctx.fillRect(-6, -9, 11, 3);
           ctx.restore();
         }
 
         function drawOverlay() {
-          if (game.mode === "running") return;
-
           ctx.save();
           ctx.textAlign = "center";
-
-          ctx.fillStyle = "rgba(2,6,23,0.68)";
-          roundedRect(36, 210, W - 72, 160, 24);
-          ctx.fill();
-
-          ctx.strokeStyle = "rgba(190,242,100,0.48)";
-          ctx.lineWidth = 2;
-          roundedRect(36, 210, W - 72, 160, 24);
-          ctx.stroke();
-
-          ctx.fillStyle = "#bef264";
-          ctx.font = "900 28px sans-serif";
-
-          ctx.fillText(
-            game.mode === "gameover" ? "GAME OVER" : "FLOPPY ARCADE",
-            W / 2,
-            270,
-          );
-
           ctx.fillStyle = "#ffffff";
-          ctx.font = "700 15px sans-serif";
-          ctx.fillText("Toca para jugar", W / 2, 315);
+          ctx.font = "900 46px ui-monospace, SFMono-Regular, Menlo, monospace";
+          ctx.shadowColor = "rgba(139,92,246,0.72)";
+          ctx.shadowBlur = 16;
+          ctx.fillText(String(game.score), W / 2, 76);
+          ctx.shadowBlur = 0;
 
+          if (game.mode !== "running") {
+            ctx.fillStyle = "rgba(2,6,23,0.68)";
+            roundedRect(36, 196, W - 72, 194, 24);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(190,242,100,0.48)";
+            ctx.lineWidth = 2;
+            roundedRect(36, 196, W - 72, 194, 24);
+            ctx.stroke();
+
+            ctx.fillStyle = "#bef264";
+            ctx.font = "900 28px ui-monospace, SFMono-Regular, Menlo, monospace";
+            ctx.fillText(game.mode === "gameover" ? "GAME OVER" : "FLOPPY ARCADE", W / 2, 248);
+            ctx.fillStyle = "#e2e8f0";
+            ctx.font = "700 15px ui-monospace, SFMono-Regular, Menlo, monospace";
+            ctx.fillText("Toca o pulsa espacio", W / 2, 292);
+            ctx.fillText(game.mode === "gameover" ? "para reiniciar" : "para levantar el vuelo", W / 2, 318);
+            ctx.fillStyle = "#a78bfa";
+            ctx.font = "900 12px ui-monospace, SFMono-Regular, Menlo, monospace";
+            ctx.fillText("ESQUIVA LOS PORTALES NEON", W / 2, 354);
+          }
           ctx.restore();
         }
 
         function draw() {
           const sx = canvas.width / W;
           const sy = canvas.height / H;
-
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.setTransform(sx, 0, 0, sy, 0, 0);
-
           drawBackground();
           game.obstacles.forEach(drawObstacle);
           drawGround();
@@ -388,7 +859,6 @@
           }
 
           const speed = 166 + Math.min(game.score * 5.2, 96);
-
           game.backgroundOffset += delta;
           game.velocity += GRAVITY * delta;
           game.playerY += game.velocity * delta;
@@ -402,13 +872,11 @@
               width: PIPE_W,
               passed: false,
             });
-
             game.spawnTimer = 1.34;
           }
 
           for (const obstacle of game.obstacles) {
             obstacle.x -= speed * delta;
-
             if (!obstacle.passed && obstacle.x + obstacle.width < PLAYER_X - PLAYER_R) {
               obstacle.passed = true;
               game.score += 1;
@@ -433,7 +901,6 @@
             const overlapsX = right > obstacle.x && left < obstacle.x + obstacle.width;
             const gapTop = obstacle.gapY - obstacle.gap / 2;
             const gapBottom = obstacle.gapY + obstacle.gap / 2;
-
             return overlapsX && (top < gapTop || bottom > gapBottom);
           });
         }
@@ -441,13 +908,23 @@
         function finishGame() {
           game.mode = "gameover";
           game.velocity = 0;
-          retryButton.style.display = "block";
+          best = Math.max(best, game.score);
+          localStorage.setItem(BEST_KEY, String(best));
+          bestEl.textContent = String(best);
+          flapButton.textContent = "Reintentar";
+          void submitScore(game.score);
         }
 
         function reset(startRunning = false) {
           game = initialState(startRunning ? "running" : "ready");
           scoreEl.textContent = "0";
-          retryButton.style.display = "none";
+          flapButton.textContent = startRunning ? "Saltar" : "Saltar";
+          setSaveStatus(
+            currentUser || currentUserId
+              ? "Tu proxima run se guardara en tu cuenta."
+              : "Cada portal cuenta 1 punto.",
+            currentUser || currentUserId ? "saved" : "",
+          );
         }
 
         function flap() {
@@ -465,12 +942,9 @@
 
         function tick(time) {
           resize();
-
           const previous = game.lastTime || time;
           const delta = Math.min((time - previous) / 1000, 0.034);
-
           game.lastTime = time;
-
           update(delta);
 
           if (game.mode === "running" && hasCollision()) {
@@ -478,7 +952,6 @@
           }
 
           draw();
-
           requestAnimationFrame(tick);
         }
 
@@ -486,31 +959,23 @@
           event.preventDefault();
           flap();
         });
-
-        retryButton.addEventListener("click", () => reset(true));
-
-        window.addEventListener(
-          "keydown",
-          (event) => {
-            if (
-              event.code === "Space" ||
-              event.code === "ArrowUp" ||
-              event.code === "KeyW"
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              flap();
-            }
-          },
-          { passive: false },
-        );
-
+        flapButton.addEventListener("click", flap);
+        resetButton.addEventListener("click", () => reset(false));
+        window.addEventListener("keydown", (event) => {
+          if (event.code === "Space" || event.code === "ArrowUp" || event.code === "KeyW") {
+            event.preventDefault();
+            flap();
+          }
+          if (event.code === "KeyR") {
+            reset(false);
+          }
+        });
         window.addEventListener("resize", resize);
 
+        void hydrateAccount();
         resize();
         requestAnimationFrame(tick);
       })();
     </script>
   </body>
 </html>
-```
